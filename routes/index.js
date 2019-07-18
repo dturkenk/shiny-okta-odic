@@ -7,8 +7,8 @@ var router = express.Router();
 var env = process.env;
 
 // This adds support for the current way to sso
-var authenticateWithDefaultPrompt = passport.authenticate('auth0', {});
-var authenticateWithPromptNone = passport.authenticate('auth0', {
+var authenticateWithDefaultPrompt = passport.authenticate('oidc', {});
+var authenticateWithPromptNone = passport.authenticate('oidc', {
   prompt: 'none'
 });
 
@@ -29,22 +29,9 @@ router.get('/login',
     res.redirect('/reports/');
   });
 
-router.get('/logout', function(req, res){
-  var logoutUrl = env.LOGOUT_URL;
-
-  if (env.LOGOUT_AUTH0 === 'true') {
-    logoutUrl = 'https://' + env.AUTH0_DOMAIN + '/v2/logout?returnTo=' 
-      + env.LOGOUT_URL + '&client_id=' + env.AUTH0_CLIENT_ID
-      + (env.LOGOUT_FEDERATED === 'true'? '&federated' : '');
-  }
-  
-  req.logout();
-  res.redirect(logoutUrl);
-});
-
-router.get('/callback',
+router.get('/authorization-code/callback',
   function (req, res, next) {
-    passport.authenticate('auth0', function (err, user, info) {
+    passport.authenticate('oidc', function (err, user, info) {
       if (err) {
         next(err);
       }
@@ -62,7 +49,7 @@ router.get('/callback',
         });
       }
 
-      next(new Error(info));
+      next(new Error(JSON.stringify(info)));
     })(req, res, next);
   });
 

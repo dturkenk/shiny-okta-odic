@@ -7,7 +7,7 @@ var bodyParser = require('body-parser');
 var session = require('express-session');
 var dotenv = require('dotenv')
 var passport = require('passport');
-var Auth0Strategy = require('passport-auth0');
+var OidcStrategy = require('passport-openidconnect').Strategy;
 
 dotenv.load();
 
@@ -16,27 +16,33 @@ var reports = require('./routes/reports');
 
 // Default everything to false
 process.env.CHECK_SESSION = process.env.CHECK_SESSION || 'false';
-process.env.LOGOUT_AUTH0 = process.env.LOGOUT_AUTH0 || 'false';
+process.env.LOGOUT_OKTA = process.env.LOGOUT_OKTA || 'false';
 process.env.LOGOUT_FEDERATED = process.env.FEDERATED || 'false';
 
 if (process.env.LOGOUT_FEDERATED === 'true') {
-  process.env.LOGOUT_AUTH0 = 'true';
+  process.env.LOGOUT_OKTA = 'true';
 }
 
-// This will configure Passport to use Auth0
-var strategy = new Auth0Strategy({
-    domain:       process.env.AUTH0_DOMAIN,
-    clientID:     process.env.AUTH0_CLIENT_ID,
-    clientSecret: process.env.AUTH0_CLIENT_SECRET,
-    callbackURL:  process.env.AUTH0_CALLBACK_URL
-  }, function(accessToken, refreshToken, extraParams, profile, done) {
-    // accessToken is the token to call Auth0 API (not needed in the most cases)
-    // extraParams.id_token has the JSON Web Token
-    // profile has all the information from the user
-    return done(null, profile);
-  });
+// This will configure Passport to use Okta via OpenIDConnect
+var domain = process.env.OKTA_DOMAIN;
+var clientID = process.env.OKTA_CLIENT_ID;
+var clientSecret = process.env.OKTA_CLIENT_SECRET;
+var callbackURL = process.env.OKTA_CALLBACK_URL;
 
-passport.use(strategy);
+var strategy = new OidcStrategy({
+  issuer: `https://${domain}/oauth2/default`,
+  authorizationURL: `https://${domain}/oauth2/default/v1/authorize`,
+  tokenURL: `https://${domain}/oauth2/default/v1/token`,
+  userInfoURL: `https://${domain}/oauth2/default/v1/userinfo`,
+  clientID: clientID,
+  clientSecret: clientSecret,
+  callbackURL: callbackURL,
+  scope: 'openid profile'
+}, (issuer, sub, profile, accessToken, refreshToken, done) => {
+  return done(null, profile);
+})
+
+passport.use('oidc', strategy);
 
 // you can use this section to keep a smaller payload
 passport.serializeUser(function(user, done) {
